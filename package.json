@@ -1,0 +1,16 @@
+{
+    "name": "infrastructure",
+    "main": "index.ts",
+    "devDependencies": {
+        "@types/lodash": "^4.17.0",
+        "@types/node": "^18"
+    },
+    "dependencies": {
+        "@pulumi/gcp": "^7.0.0",
+        "@pulumi/kubernetes": "^4.9.1",
+        "@pulumi/kubernetes-cert-manager": "^0.0.5",
+        "@pulumi/pulumi": "^3.0.0",
+        "lodash": "^4.17.21",
+        "ts-extras": "^0.11.0"
+    }
+}

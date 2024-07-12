@@ -1,0 +1,9 @@
+name: infrastructure
+runtime: nodejs
+description: A minimal Google Cloud TypeScript Pulumi program
+backend:
+  url: file://.pulumi
+config:
+  pulumi:tags:
+    value:
+      pulumi:template: gcp-typescript
