@@ -45,7 +45,7 @@ export class MeetVerseCluster extends pulumi.ComponentResource {
       },
       nodeConfig: {
         machineType: "n1-standard-2",
-        diskSizeGb: diskSize,
+        diskSizeGb: 50,
         oauthScopes: [
           "https://www.googleapis.com/auth/compute",
           "https://www.googleapis.com/auth/devstorage.read_only",
