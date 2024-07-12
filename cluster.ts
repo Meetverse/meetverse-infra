@@ -21,7 +21,7 @@ export class MeetVerseCluster extends pulumi.ComponentResource {
   ) {
     super("Meetverse:Cluster", "cluster");
     const name = "meetverse-cluster";
-    diskSize = 100;
+    diskSize = diskSize || 100;
     // Create a GKE cluster
     const engineVersion = gcp.container
       .getEngineVersions()
@@ -29,19 +29,23 @@ export class MeetVerseCluster extends pulumi.ComponentResource {
     const cluster = new gcp.container.Cluster(name, {
       initialNodeCount: 1,
       removeDefaultNodePool: true,
-      minMasterVersion: engineVersion
+      minMasterVersion: engineVersion,
+      nodeConfig: {
+        machineType: "n1-standard-1",
+        diskSizeGb: 50
+      }
     });
 
     new gcp.container.NodePool("meetverse-node-pool", {
       cluster: cluster.name,
-      initialNodeCount: 2,
+      initialNodeCount: 1,
       autoscaling: {
         minNodeCount: 0,
-        maxNodeCount: 4
+        maxNodeCount: 1
       },
       nodeConfig: {
         machineType: "n1-standard-2",
-        diskSizeGb: 100,
+        diskSizeGb: diskSize,
         oauthScopes: [
           "https://www.googleapis.com/auth/compute",
           "https://www.googleapis.com/auth/devstorage.read_only",
