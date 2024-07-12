@@ -12,7 +12,7 @@ templateSettings.interpolate = /\${([\s\S]+?)}/g;
 
 export class MeetVerseCluster extends pulumi.ComponentResource {
   public nginxRelease: k8s.helm.v3.Release;
-
+  public clusterProvider: k8s.Provider;
   constructor(
     adminEmail: string,
     repository: Repository,
@@ -67,7 +67,7 @@ export class MeetVerseCluster extends pulumi.ComponentResource {
     const clusterProvider = new k8s.Provider(name, {
       kubeconfig: kubeconfig
     });
-
+    this.clusterProvider = clusterProvider;
     const nginx = new NginxChart(clusterProvider);
     this.nginxRelease = nginx.release;
 
