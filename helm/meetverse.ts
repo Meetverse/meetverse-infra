@@ -3,6 +3,7 @@ import * as pulumi from "@pulumi/pulumi";
 import * as gcp from "@pulumi/gcp";
 import { Repository } from "@pulumi/gcp/artifactregistry";
 import { MeetVerseSecret, MeetverseSecrets } from "../secret";
+import { updater } from "../updater";
 
 type SecretValue = {
   name: string;
@@ -54,7 +55,7 @@ export class MeetverseChart extends pulumi.ComponentResource {
       accountId: "meetverse-sa",
       displayName: "Service Account for meetverse application"
     });
-
+    updater(meetversesNs, provider);
     meetversesNs.metadata.name.apply(async (namespace) => {
       gcp.organizations.getProject({}).then((project) => {
         config.requireSecret("qdrant-key").apply((qdrantKey) => {
