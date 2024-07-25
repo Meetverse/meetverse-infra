@@ -36,6 +36,8 @@ cluster.nginxRelease.resourceNames.apply((resources) => {
     return "IP not available yet";
   });
   serviceExternalIP.apply((ip) => {
+    pulumi.log.info(`Meetverse deployment IP: ${ip}`);
+
     new MeetVerseDNS(ip, webHostname);
   });
 });
