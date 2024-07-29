@@ -13,6 +13,7 @@ templateSettings.interpolate = /\${([\s\S]+?)}/g;
 export class MeetVerseCluster extends pulumi.ComponentResource {
   public nginxRelease: k8s.helm.v3.Release;
   public clusterProvider: k8s.Provider;
+
   constructor(
     adminEmail: string,
     repository: Repository,
@@ -23,6 +24,19 @@ export class MeetVerseCluster extends pulumi.ComponentResource {
     const config = new pulumi.Config();
     const name = "meetverse-cluster";
     diskSize = diskSize || 100;
+
+    const serviceAccountEmail = config.get("serviceAccountEmail");
+
+    let serviceAccountAddition = {};
+    if (
+      !!serviceAccountEmail &&
+      serviceAccountEmail !== "" &&
+      serviceAccountEmail !== "default"
+    ) {
+      serviceAccountAddition = {
+        serviceAccount: serviceAccountEmail
+      };
+    }
     // Create a GKE cluster
     const engineVersion = gcp.container
       .getEngineVersions()
@@ -43,7 +57,8 @@ export class MeetVerseCluster extends pulumi.ComponentResource {
       ...addition,
       nodeConfig: {
         machineType: "n1-standard-1",
-        diskSizeGb: 50
+        diskSizeGb: 50,
+        ...serviceAccountAddition
       }
     });
 
@@ -62,7 +77,8 @@ export class MeetVerseCluster extends pulumi.ComponentResource {
           "https://www.googleapis.com/auth/devstorage.read_only",
           "https://www.googleapis.com/auth/logging.write",
           "https://www.googleapis.com/auth/monitoring"
-        ]
+        ],
+        ...serviceAccountAddition
       }
     });
 
