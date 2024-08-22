@@ -55,233 +55,262 @@ export class MeetverseChart extends pulumi.ComponentResource {
       accountId: "meetverse-sa",
       displayName: "Service Account for meetverse application"
     });
+
     updater(meetversesNs, provider);
     meetversesNs.metadata.name.apply(async (namespace) => {
       gcp.organizations.getProject({}).then((project) => {
         config.requireSecret("qdrant-key").apply((qdrantKey) => {
-          config.requireSecret("openai-key").apply((openaiKey) => {
-            config
-              .requireSecret("google-client_id")
-              .apply((google_client_id) => {
-                config.requireSecret("google-secret").apply((google_secret) => {
-                  config
-                    .requireSecret("google-client_id")
-                    .apply((google_client_id) => {
-                      config.requireSecret("dbrootpass").apply((dbrootpass) => {
-                        config.requireSecret("dbpass").apply((dbpass) => {
-                          const secretValues: MeetVerseSecret = {
-                            OPENAI_API_KEY: openaiKey,
-                            GOOGLE_CLIENT_ID: google_client_id,
-                            GOOGLE_CLIENT_SECRET: google_secret,
-                            QDRANT_API_KEY: qdrantKey,
-                            MONGODB_URI: `mongodb://${dbuser}:${dbpass}@${mongoServiceName}.${namespace}.svc.cluster.local/${dbname}`,
-                            "mongodb-passwords": dbpass,
-                            "mongodb-root-password": dbrootpass
-                          };
-                          const secret = new MeetverseSecrets(
-                            namespace,
-                            secretValues,
-                            provider
-                          );
-                          secret.secretResource.metadata.name.apply(
-                            (secretname) => {
-                              let env: Env[] = [
-                                {
-                                  name: "WEB_URI",
-                                  value: `https://${webHostname}`
-                                },
+          config.requireSecret("google-client_id").apply((google_client_id) => {
+            config.requireSecret("google-secret").apply((google_secret) => {
+              config
+                .requireSecret("google-client_id")
+                .apply((google_client_id) => {
+                  config.requireSecret("dbrootpass").apply((dbrootpass) => {
+                    config.requireSecret("dbpass").apply((dbpass) => {
+                      // Create the 'Vertex AI User' service account
+                      const vertexAiUser = new gcp.serviceaccount.Account(
+                        "vertexAiUser",
+                        {
+                          accountId: "vertex-ai-user",
+                          displayName: "Vertex AI User"
+                        }
+                      );
+                      pulumi.log.info(
+                        `Meetverse deployment project: ${project.projectId}`
+                      );
 
-                                {
-                                  name: "QDRANT_HOST",
-                                  value: `${qdrantServiceName}.${namespace}.svc.cluster.local`
-                                },
-                                {
-                                  name: "QDRANT_PORT",
-                                  value: "6333"
-                                },
-                                {
-                                  name: "QDRANT_HTTPS",
-                                  value: "false"
-                                },
-                                {
-                                  name: "QDRANT_COLLECTION",
-                                  value: "meetverse"
-                                },
-                                {
-                                  name: "GOOGLE_REDIRECT_URIS",
-                                  value: `["http://localhost:8000/api/oauth2callback","https://${webHostname}/oauth2callback"]`
-                                },
-                                {
-                                  name: "RUN_MODE",
-                                  value: "cloud"
-                                },
-                                {
-                                  name: "DB_NAME",
-                                  value: dbname
-                                },
-                                {
-                                  name: "PERSISTENT_SESSION",
-                                  value: "true"
-                                },
-                                {
-                                  name: "DD_LOGS_INJECTION",
-                                  value: "false"
-                                },
-                                {
-                                  name: "DD_SITE",
-                                  value: "us5.datadoghq.com"
-                                },
-                                {
-                                  name: "DD_TRACE_ENABLED",
-                                  value: "true"
-                                },
-                                {
-                                  name: "DD_TRACE_PROPAGATION_STYLE",
-                                  value: "datadog"
-                                },
-                                {
-                                  name: "GOOGLE_PROJECT_ID",
-                                  value: project.projectId
-                                }
-                              ];
-                              Object.keys(secretValues).map((key) => {
-                                env.push({
-                                  name: key,
-                                  valueFrom: {
-                                    secretKeyRef: {
-                                      name: secretname,
-                                      key: key
-                                    }
-                                  }
-                                });
-                              });
-                              new k8s.helm.v3.Release(
-                                "meetverse-chart",
-                                {
-                                  chart: "meetverse",
-                                  version: "0.3.9",
-                                  namespace: meetversesNs.metadata.name,
-                                  repositoryOpts: {
-                                    repo: "https://meetverse.github.io/meetverse-chart"
-                                  },
-                                  skipCrds: false,
-                                  values: {
-                                    replicaCount: 1,
-                                    env: env,
-                                    frontend: {
-                                      image: {
-                                        tag: "latest"
-                                      },
-                                      service: {
-                                        port: 8080
-                                      }
-                                    },
-                                    livenessProbe: {
-                                      httpGet: {
-                                        path: "/health",
-                                        port: "http"
-                                      }
-                                    },
-                                    readinessProbe: {
-                                      httpGet: {
-                                        path: "/health",
-                                        port: "http"
-                                      }
-                                    },
-                                    resources: {
-                                      requests: {
-                                        cpu: "512m",
-                                        memory: "2Gi"
-                                      },
-                                      limits: {
-                                        cpu: "512m",
-                                        memory: "2Gi"
-                                      }
-                                    },
-                                    image: {
-                                      pullPolicy: "Always",
-                                      tag: "latest"
-                                    },
-                                    serviceAccount: {
-                                      name: "meetverse-k8s",
-                                      annotations: {
-                                        "iam.gke.io/gcp-service-account":
-                                          serviceAccount.email
-                                      }
-                                    },
-                                    ingress: {
-                                      annotations: annotations,
-                                      tls: [
-                                        {
-                                          secretName: "meetverse-tls",
-                                          hosts: [webHostname]
-                                        }
-                                      ],
-                                      hosts: [
-                                        {
-                                          host: webHostname,
-                                          paths: [
-                                            {
-                                              path: "/",
-                                              pathType: "ImplementationSpecific"
-                                            },
-                                            {
-                                              path: "/api",
-                                              pathType: "ImplementationSpecific"
-                                            },
-                                            {
-                                              path: "/ws",
-                                              pathType: "ImplementationSpecific"
-                                            }
-                                          ]
-                                        }
-                                      ]
-                                    },
-                                    qdrant: {
-                                      apiKey: qdrantKey,
-                                      fullnameOverride: "qdrant"
-                                    },
-                                    mongodb: {
-                                      resources: {
-                                        requests: {
-                                          cpu: "500m",
-                                          memory: "512Mi"
-                                        },
-                                        limits: {
-                                          cpu: "500m",
-                                          memory: "512Mi"
-                                        }
-                                      },
-                                      service: {
-                                        nameOverride: mongoServiceName
-                                      },
-                                      auth: {
-                                        usernames: [dbuser],
-                                        databases: [dbname],
-                                        existingSecret: secretname
-                                      }
-                                    }
-                                  }
-                                },
-                                { provider: provider }
-                              );
+                      // Assign necessary roles to the service account
+                      const vertexAiUserRoleBinding =
+                        new gcp.projects.IAMMember("vertexAiUserRoleBinding", {
+                          project: pulumi.interpolate`${project.projectId}`,
+                          role: "roles/aiplatform.user",
+                          member: pulumi.interpolate`serviceAccount:${vertexAiUser.email}`
+                        });
+                      const vertexAiUserKey = new gcp.serviceaccount.Key(
+                        "vertexAiUserKey",
+                        {
+                          serviceAccountId: vertexAiUser.name
+                        }
+                      );
 
-                              new gcp.artifactregistry.RepositoryIamMember(
-                                "iam-member",
-                                {
-                                  location: repository.location,
-                                  repository: repository.name,
-                                  role: "roles/artifactregistry.reader",
-                                  member: pulumi.interpolate`serviceAccount:${serviceAccount.email}`
-                                }
-                              );
-                            }
+                      const vertexAiUserKeyJson =
+                        vertexAiUserKey.privateKey.apply((privateKey) => {
+                          return Buffer.from(privateKey, "base64").toString(
+                            "utf-8"
                           );
                         });
-                      });
+                      const secretValues: MeetVerseSecret = {
+                        GOOGLE_CLIENT_ID: google_client_id,
+                        GOOGLE_CLIENT_SECRET: google_secret,
+                        QDRANT_API_KEY: qdrantKey,
+                        MONGODB_URI: `mongodb://${dbuser}:${dbpass}@${mongoServiceName}.${namespace}.svc.cluster.local/${dbname}`,
+                        "mongodb-passwords": dbpass,
+                        "mongodb-root-password": dbrootpass,
+                        VERTEX_AI_USER_KEY: vertexAiUserKeyJson
+                      };
+                      const secret = new MeetverseSecrets(
+                        namespace,
+                        secretValues,
+                        provider
+                      );
+                      secret.secretResource.metadata.name.apply(
+                        (secretname) => {
+                          let env: Env[] = [
+                            {
+                              name: "WEB_URI",
+                              value: `https://${webHostname}`
+                            },
+
+                            {
+                              name: "QDRANT_HOST",
+                              value: `${qdrantServiceName}.${namespace}.svc.cluster.local`
+                            },
+                            {
+                              name: "QDRANT_PORT",
+                              value: "6333"
+                            },
+                            {
+                              name: "QDRANT_HTTPS",
+                              value: "false"
+                            },
+                            {
+                              name: "QDRANT_COLLECTION",
+                              value: "meetverse"
+                            },
+                            {
+                              name: "GOOGLE_REDIRECT_URIS",
+                              value: `["http://localhost:8000/api/oauth2callback","https://${webHostname}/oauth2callback"]`
+                            },
+                            {
+                              name: "RUN_MODE",
+                              value: "cloud"
+                            },
+                            {
+                              name: "DB_NAME",
+                              value: dbname
+                            },
+                            {
+                              name: "PERSISTENT_SESSION",
+                              value: "true"
+                            },
+                            {
+                              name: "DD_LOGS_INJECTION",
+                              value: "false"
+                            },
+                            {
+                              name: "DD_SITE",
+                              value: "us5.datadoghq.com"
+                            },
+                            {
+                              name: "DD_TRACE_ENABLED",
+                              value: "true"
+                            },
+                            {
+                              name: "DD_TRACE_PROPAGATION_STYLE",
+                              value: "datadog"
+                            },
+                            {
+                              name: "GOOGLE_PROJECT_ID",
+                              value: project.projectId
+                            }
+                          ];
+                          Object.keys(secretValues).map((key) => {
+                            env.push({
+                              name: key,
+                              valueFrom: {
+                                secretKeyRef: {
+                                  name: secretname,
+                                  key: key
+                                }
+                              }
+                            });
+                          });
+                          new k8s.helm.v3.Release(
+                            "meetverse-chart",
+                            {
+                              chart: "meetverse",
+                              version: "0.3.9",
+                              namespace: meetversesNs.metadata.name,
+                              repositoryOpts: {
+                                repo: "https://meetverse.github.io/meetverse-chart"
+                              },
+                              skipCrds: false,
+                              values: {
+                                replicaCount: 1,
+                                env: env,
+                                frontend: {
+                                  image: {
+                                    tag: "latest"
+                                  },
+                                  service: {
+                                    port: 8080
+                                  }
+                                },
+                                livenessProbe: {
+                                  httpGet: {
+                                    path: "/health",
+                                    port: "http"
+                                  }
+                                },
+                                readinessProbe: {
+                                  httpGet: {
+                                    path: "/health",
+                                    port: "http"
+                                  }
+                                },
+                                resources: {
+                                  requests: {
+                                    cpu: "512m",
+                                    memory: "2Gi"
+                                  },
+                                  limits: {
+                                    cpu: "512m",
+                                    memory: "2Gi"
+                                  }
+                                },
+                                image: {
+                                  pullPolicy: "Always",
+                                  tag: "latest"
+                                },
+                                serviceAccount: {
+                                  name: "meetverse-k8s",
+                                  annotations: {
+                                    "iam.gke.io/gcp-service-account":
+                                      serviceAccount.email
+                                  }
+                                },
+                                ingress: {
+                                  annotations: annotations,
+                                  tls: [
+                                    {
+                                      secretName: "meetverse-tls",
+                                      hosts: [webHostname]
+                                    }
+                                  ],
+                                  hosts: [
+                                    {
+                                      host: webHostname,
+                                      paths: [
+                                        {
+                                          path: "/",
+                                          pathType: "ImplementationSpecific"
+                                        },
+                                        {
+                                          path: "/api",
+                                          pathType: "ImplementationSpecific"
+                                        },
+                                        {
+                                          path: "/ws",
+                                          pathType: "ImplementationSpecific"
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                },
+                                qdrant: {
+                                  apiKey: qdrantKey,
+                                  fullnameOverride: "qdrant"
+                                },
+                                mongodb: {
+                                  resources: {
+                                    requests: {
+                                      cpu: "500m",
+                                      memory: "512Mi"
+                                    },
+                                    limits: {
+                                      cpu: "500m",
+                                      memory: "512Mi"
+                                    }
+                                  },
+                                  service: {
+                                    nameOverride: mongoServiceName
+                                  },
+                                  auth: {
+                                    usernames: [dbuser],
+                                    databases: [dbname],
+                                    existingSecret: secretname
+                                  }
+                                }
+                              }
+                            },
+                            { provider: provider }
+                          );
+
+                          new gcp.artifactregistry.RepositoryIamMember(
+                            "iam-member",
+                            {
+                              location: repository.location,
+                              repository: repository.name,
+                              role: "roles/artifactregistry.reader",
+                              member: pulumi.interpolate`serviceAccount:${serviceAccount.email}`
+                            }
+                          );
+                        }
+                      );
                     });
+                  });
                 });
-              });
+            });
           });
         });
       });

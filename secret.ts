@@ -2,13 +2,13 @@ import * as pulumi from "@pulumi/pulumi";
 import * as k8s from "@pulumi/kubernetes";
 
 export type MeetVerseSecret = {
-  OPENAI_API_KEY: string;
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
   QDRANT_API_KEY: string;
   MONGODB_URI: string;
   "mongodb-passwords": string;
   "mongodb-root-password": string;
+  VERTEX_AI_USER_KEY: pulumi.Output<string>;
 };
 
 export class MeetverseSecrets extends pulumi.ComponentResource {
