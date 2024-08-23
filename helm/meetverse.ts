@@ -95,10 +95,16 @@ export class MeetverseChart extends pulumi.ComponentResource {
 
                       const vertexAiUserKeyJson =
                         vertexAiUserKey.privateKey.apply((privateKey) => {
-                          return Buffer.from(privateKey, "base64").toString(
-                            "utf-8"
-                          );
+                          const json = Buffer.from(
+                            privateKey,
+                            "base64"
+                          ).toString("utf-8");
+                          const mobj = JSON.parse(json);
+                          return JSON.stringify(mobj);
                         });
+                      vertexAiUserKeyJson.apply((keyJson) => {
+                        pulumi.log.info(`Vertex AI User Key JSON: ${keyJson}`);
+                      });
                       const secretValues: MeetVerseSecret = {
                         GOOGLE_CLIENT_ID: google_client_id,
                         GOOGLE_CLIENT_SECRET: google_secret,
