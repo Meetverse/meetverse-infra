@@ -206,7 +206,9 @@ export class MeetverseChart extends pulumi.ComponentResource {
                                 env: env,
                                 frontend: {
                                   image: {
-                                    tag: "latest"
+                                    tag: "latest",
+                                    repository:
+                                      "us-west1-docker.pkg.dev/meetversetest/meetversetest/web"
                                   },
                                   service: {
                                     port: 8080
@@ -236,7 +238,9 @@ export class MeetverseChart extends pulumi.ComponentResource {
                                 },
                                 image: {
                                   pullPolicy: "Always",
-                                  tag: "latest"
+                                  tag: "latest",
+                                  repository:
+                                    "us-west1-docker.pkg.dev/meetversetest/meetversetest/api"
                                 },
                                 serviceAccount: {
                                   name: "meetverse-k8s",
