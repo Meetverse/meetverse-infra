@@ -55,7 +55,20 @@ export class MeetverseChart extends pulumi.ComponentResource {
       accountId: "meetverse-sa",
       displayName: "Service Account for meetverse application"
     });
-
+    const topic = new gcp.pubsub.Topic("meetverse-meeting-topic", {
+      name: "meetverse-meeting-topic"
+    });
+    const subscription = new gcp.pubsub.Subscription(
+      "meetverse-meeting-subscription",
+      {
+        name: "meetverse-meeting-subscription",
+        topic: topic.name,
+        pushConfig: {
+          pushEndpoint: `https://${webHostname}/api/meetingUpdated `
+        },
+        ackDeadlineSeconds: 30
+      }
+    );
     updater(meetversesNs, provider);
     meetversesNs.metadata.name.apply(async (namespace) => {
       gcp.organizations.getProject({}).then((project) => {
@@ -67,6 +80,13 @@ export class MeetverseChart extends pulumi.ComponentResource {
                 .apply((google_client_id) => {
                   config.requireSecret("dbrootpass").apply((dbrootpass) => {
                     config.requireSecret("dbpass").apply((dbpass) => {
+                      new gcp.pubsub.TopicIAMMember("topic-iam-binding", {
+                        topic: topic.name.apply(
+                          (t) => `${project.id}/topics/${t}`
+                        ),
+                        role: "roles/pubsub.publisher",
+                        member: "allAuthenticatedUsers"
+                      });
                       // Create the 'Vertex AI User' service account
                       const vertexAiUser = new gcp.serviceaccount.Account(
                         "vertexAiUser",
@@ -178,6 +198,14 @@ export class MeetverseChart extends pulumi.ComponentResource {
                             {
                               name: "GOOGLE_PROJECT_ID",
                               value: project.projectId
+                            },
+                            {
+                              name: "MEETING_TOPIC_NAME",
+                              value: `${topic.name}`
+                            },
+                            {
+                              name: "MEETING_SUBSCRIPTION_NAME",
+                              value: `${subscription.name}`
                             }
                           ];
                           Object.keys(secretValues).map((key) => {
