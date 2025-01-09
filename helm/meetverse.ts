@@ -23,7 +23,8 @@ type Env = {
 const config = new pulumi.Config();
 const dbuser = config.require("dbuser");
 const dbname = config.require("dbname");
-
+const projectId = config.get("externalProjectId");
+const externalVertexKey = config.get("externalVertexKey");
 export class MeetverseChart extends pulumi.ComponentResource {
   constructor(
     provider: k8s.Provider,
@@ -35,6 +36,7 @@ export class MeetverseChart extends pulumi.ComponentResource {
 
     const mongoServiceName = "mongodb";
     const qdrantServiceName = "qdrant";
+    var isExternalProject = projectId !== undefined;
 
     const appLabels = {
       app: "meetverse"
@@ -50,25 +52,24 @@ export class MeetverseChart extends pulumi.ComponentResource {
       },
       { provider: provider }
     );
-
     const serviceAccount = new gcp.serviceaccount.Account("service-account", {
       accountId: "meetverse-sa",
       displayName: "Service Account for meetverse application"
     });
-    const topic = new gcp.pubsub.Topic("meetverse-meeting-topic", {
-      name: "meetverse-meeting-topic"
-    });
-    const subscription = new gcp.pubsub.Subscription(
-      "meetverse-meeting-subscription",
-      {
+    let topic: any = undefined;
+    if (!isExternalProject) {
+      topic = new gcp.pubsub.Topic("meetverse-meeting-topic", {
+        name: "meetverse-meeting-topic"
+      });
+      new gcp.pubsub.Subscription("meetverse-meeting-subscription", {
         name: "meetverse-meeting-subscription",
         topic: topic.name,
         pushConfig: {
           pushEndpoint: `https://${webHostname}/api/meetingUpdated `
         },
         ackDeadlineSeconds: 30
-      }
-    );
+      });
+    }
     updater(meetversesNs, provider);
     meetversesNs.metadata.name.apply(async (namespace) => {
       gcp.organizations.getProject({}).then((project) => {
@@ -80,51 +81,77 @@ export class MeetverseChart extends pulumi.ComponentResource {
                 .apply((google_client_id) => {
                   config.requireSecret("dbrootpass").apply((dbrootpass) => {
                     config.requireSecret("dbpass").apply((dbpass) => {
-                      new gcp.pubsub.TopicIAMMember("topic-iam-binding", {
-                        topic: topic.name.apply(
-                          (t) => `${project.id}/topics/${t}`
-                        ),
-                        role: "roles/pubsub.publisher",
-                        member: "allAuthenticatedUsers"
-                      });
-                      // Create the 'Vertex AI User' service account
-                      const vertexAiUser = new gcp.serviceaccount.Account(
-                        "vertexAiUser",
-                        {
-                          accountId: "vertex-ai-user",
-                          displayName: "Vertex AI User"
-                        }
-                      );
-                      pulumi.log.info(
-                        `Meetverse deployment project: ${project.projectId}`
-                      );
-
-                      // Assign necessary roles to the service account
-                      const vertexAiUserRoleBinding =
-                        new gcp.projects.IAMMember("vertexAiUserRoleBinding", {
-                          project: pulumi.interpolate`${project.projectId}`,
-                          role: "roles/aiplatform.user",
-                          member: pulumi.interpolate`serviceAccount:${vertexAiUser.email}`
+                      var projectIdToUse: any = isExternalProject
+                        ? projectId
+                        : project.projectId;
+                      var setExternalProject = isExternalProject
+                        ? "true"
+                        : "false";
+                      var topicName = isExternalProject
+                        ? project.projectId
+                        : "meetverse-meeting-topic";
+                      var vertexAiKeyToUse: any = undefined;
+                      if (externalVertexKey !== undefined) {
+                        try {
+                          var json = JSON.parse(externalVertexKey);
+                          vertexAiKeyToUse = JSON.stringify(json);
+                        } catch (error) {}
+                      }
+                      if (!isExternalProject) {
+                        new gcp.pubsub.TopicIAMMember("topic-iam-binding", {
+                          topic: topic.name.apply(
+                            (t) => `${project.id}/topics/${t}`
+                          ),
+                          role: "roles/pubsub.publisher",
+                          member: "allAuthenticatedUsers"
                         });
-                      const vertexAiUserKey = new gcp.serviceaccount.Key(
-                        "vertexAiUserKey",
-                        {
-                          serviceAccountId: vertexAiUser.name
-                        }
-                      );
+                      }
+                      if (vertexAiKeyToUse === undefined) {
+                        // Create the 'Vertex AI User' service account
+                        const vertexAiUser = new gcp.serviceaccount.Account(
+                          "vertexAiUser",
+                          {
+                            accountId: "vertex-ai-user",
+                            displayName: "Vertex AI User"
+                          }
+                        );
+                        pulumi.log.info(
+                          `Meetverse deployment project: ${project.projectId}`
+                        );
 
-                      const vertexAiUserKeyJson =
-                        vertexAiUserKey.privateKey.apply((privateKey) => {
-                          const json = Buffer.from(
-                            privateKey,
-                            "base64"
-                          ).toString("utf-8");
-                          const mobj = JSON.parse(json);
-                          return JSON.stringify(mobj);
+                        // Assign necessary roles to the service account
+                        const vertexAiUserRoleBinding =
+                          new gcp.projects.IAMMember(
+                            "vertexAiUserRoleBinding",
+                            {
+                              project: pulumi.interpolate`${project.projectId}`,
+                              role: "roles/aiplatform.user",
+                              member: pulumi.interpolate`serviceAccount:${vertexAiUser.email}`
+                            }
+                          );
+                        const vertexAiUserKey = new gcp.serviceaccount.Key(
+                          "vertexAiUserKey",
+                          {
+                            serviceAccountId: vertexAiUser.name
+                          }
+                        );
+
+                        const vertexAiUserKeyJson =
+                          vertexAiUserKey.privateKey.apply((privateKey) => {
+                            const json = Buffer.from(
+                              privateKey,
+                              "base64"
+                            ).toString("utf-8");
+                            const mobj = JSON.parse(json);
+                            return JSON.stringify(mobj);
+                          });
+                        vertexAiUserKeyJson.apply((keyJson) => {
+                          pulumi.log.info(
+                            `Vertex AI User Key JSON: ${keyJson}`
+                          );
                         });
-                      vertexAiUserKeyJson.apply((keyJson) => {
-                        pulumi.log.info(`Vertex AI User Key JSON: ${keyJson}`);
-                      });
+                        vertexAiKeyToUse = vertexAiUserKeyJson;
+                      }
                       const secretValues: MeetVerseSecret = {
                         GOOGLE_CLIENT_ID: google_client_id,
                         GOOGLE_CLIENT_SECRET: google_secret,
@@ -132,7 +159,7 @@ export class MeetverseChart extends pulumi.ComponentResource {
                         MONGODB_URI: `mongodb://${dbuser}:${dbpass}@${mongoServiceName}.${namespace}.svc.cluster.local/${dbname}`,
                         "mongodb-passwords": dbpass,
                         "mongodb-root-password": dbrootpass,
-                        VERTEX_AI_USER_KEY: vertexAiUserKeyJson
+                        VERTEX_AI_USER_KEY: vertexAiKeyToUse
                       };
                       const secret = new MeetverseSecrets(
                         namespace,
@@ -197,15 +224,19 @@ export class MeetverseChart extends pulumi.ComponentResource {
                             },
                             {
                               name: "GOOGLE_PROJECT_ID",
-                              value: project.projectId
+                              value: projectIdToUse
+                            },
+                            {
+                              name: "EXTERNAL_PROJECT",
+                              value: setExternalProject
+                            },
+                            {
+                              name: "NO_GOOGLE_DRIVE",
+                              value: setExternalProject
                             },
                             {
                               name: "MEETING_TOPIC_NAME",
-                              value: `${topic.name}`
-                            },
-                            {
-                              name: "MEETING_SUBSCRIPTION_NAME",
-                              value: `${subscription.name}`
+                              value: topicName
                             }
                           ];
                           Object.keys(secretValues).map((key) => {
@@ -258,8 +289,8 @@ export class MeetverseChart extends pulumi.ComponentResource {
                                     memory: "2Gi"
                                   },
                                   limits: {
-                                    cpu: "512m",
-                                    memory: "2Gi"
+                                    cpu: "1536m",
+                                    memory: "3Gi"
                                   }
                                 },
                                 image: {
