@@ -25,6 +25,7 @@ const dbuser = config.require("dbuser");
 const dbname = config.require("dbname");
 const projectId = config.get("externalProjectId");
 const externalVertexKey = config.get("externalVertexKey");
+const extraJson = config.get("extraJson");
 export class MeetverseChart extends pulumi.ComponentResource {
   constructor(
     provider: k8s.Provider,
@@ -97,6 +98,15 @@ export class MeetverseChart extends pulumi.ComponentResource {
                           vertexAiKeyToUse = JSON.stringify(json);
                         } catch (error) {}
                       }
+                      let extra = {};
+                      if (extraJson !== undefined) {
+                        try {
+                          var json = JSON.parse(extraJson);
+
+                          extra = json;
+                        } catch (error) {}
+                      }
+
                       if (!isExternalProject) {
                         new gcp.pubsub.TopicIAMMember("topic-iam-binding", {
                           topic: topic.name.apply(
@@ -159,7 +169,8 @@ export class MeetverseChart extends pulumi.ComponentResource {
                         MONGODB_URI: `mongodb://${dbuser}:${dbpass}@${mongoServiceName}.${namespace}.svc.cluster.local/${dbname}`,
                         "mongodb-passwords": dbpass,
                         "mongodb-root-password": dbrootpass,
-                        VERTEX_AI_USER_KEY: vertexAiKeyToUse
+                        VERTEX_AI_USER_KEY: vertexAiKeyToUse,
+                        ...extra
                       };
                       const secret = new MeetverseSecrets(
                         namespace,
@@ -289,7 +300,7 @@ export class MeetverseChart extends pulumi.ComponentResource {
                                     memory: "2Gi"
                                   },
                                   limits: {
-                                    cpu: "1536m",
+                                    cpu: "512m",
                                     memory: "3Gi"
                                   }
                                 },

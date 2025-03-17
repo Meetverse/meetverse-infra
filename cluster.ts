@@ -56,7 +56,7 @@ export class MeetVerseCluster extends pulumi.ComponentResource {
       minMasterVersion: engineVersion,
       ...addition,
       nodeConfig: {
-        machineType: "n1-standard-1",
+        machineType: "n1-standard-2",
         diskSizeGb: 50,
         ...serviceAccountAddition
       }
