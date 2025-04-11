@@ -1,7 +1,7 @@
 import * as pulumi from "@pulumi/pulumi";
 import * as k8s from "@pulumi/kubernetes";
 
-export type MeetVerseSecret = {
+export type MarzoAISecret = {
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
   QDRANT_API_KEY: string;
@@ -11,20 +11,20 @@ export type MeetVerseSecret = {
   VERTEX_AI_USER_KEY: pulumi.Output<string>;
 };
 
-export class MeetverseSecrets extends pulumi.ComponentResource {
+export class MarzoAISecrets extends pulumi.ComponentResource {
   secretResource: k8s.core.v1.Secret;
   constructor(
     namespace: string,
-    secretValues: MeetVerseSecret,
+    secretValues: MarzoAISecret,
     k8sProvider?: pulumi.ProviderResource
   ) {
-    super("Meetverse:Secrets", "meetverse-secrets");
+    super("MarzoAI:Secrets", "marzoai-secrets");
 
     this.secretResource = new k8s.core.v1.Secret(
-      "meetverse-secret",
+      "marzoai-secret",
       {
         metadata: {
-          name: "meetverse",
+          name: "marzoai",
           namespace: namespace
         },
         // `data` field must contain base64-encoded strings.

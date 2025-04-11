@@ -89,25 +89,25 @@ export function updater(
                       "-c",
                       `
 # Check deployments by timur dundar
-backendpod=$(kubectl get pods -n meetverse | grep 'meetverse-chart' | grep -v -E '(-fe-|migrate|mongodb)' | awk '{print $1}')
+backendpod=$(kubectl get pods -n marzoai | grep 'marzoai-chart' | grep -v -E '(-fe-|migrate|mongodb)' | awk '{print $1}')
 remotebackendsha=$(curl -I -H "Accept: application/vnd.docker.distribution.manifest.v2+json" "https://us-west1-docker.pkg.dev/v2/meetversetest/meetverse/api/manifests/latest" | grep docker-content-digest | cut -d' ' -f2 | tr -d '\r\n')
-backendsha=$(kubectl get pod $backendpod -n meetverse -o jsonpath="{.status.containerStatuses[0].imageID}" | cut -d'@' -f2 | tr -d '\r\n')
-frontendpod=$(kubectl get pods -n meetverse | grep 'meetverse-chart' | grep -E '(-fe-)' | awk '{print $1}')
+backendsha=$(kubectl get pod $backendpod -n marzoai -o jsonpath="{.status.containerStatuses[0].imageID}" | cut -d'@' -f2 | tr -d '\r\n')
+frontendpod=$(kubectl get pods -n marzoai | grep 'marzoai-chart' | grep -E '(-fe-)' | awk '{print $1}')
 remotefrontendsha=$(curl -I -H "Accept: application/vnd.docker.distribution.manifest.v2+json" "https://us-west1-docker.pkg.dev/v2/meetversetest/meetverse/web/manifests/latest" | grep docker-content-digest | cut -d' ' -f2 | tr -d '\r\n')
-frontendsha=$(kubectl get pod $frontendpod -n meetverse -o jsonpath="{.status.containerStatuses[0].imageID}" | cut -d'@' -f2 | tr -d '\r\n')
-backenddeployment=$(kubectl get deployments -n meetverse | awk '/meetverse-chart-/ {print $1}' | grep -v -E '(-fe$|mongodb$)')
-frontenddeployment=$(kubectl get deployments -n meetverse | awk '/meetverse-chart-/ {print $1}' | grep -E '(-fe$)')
+frontendsha=$(kubectl get pod $frontendpod -n marzoai -o jsonpath="{.status.containerStatuses[0].imageID}" | cut -d'@' -f2 | tr -d '\r\n')
+backenddeployment=$(kubectl get deployments -n marzoai | awk '/marzoai-chart-/ {print $1}' | grep -v -E '(-fe$|mongodb$)')
+frontenddeployment=$(kubectl get deployments -n marzoai | awk '/marzoai-chart-/ {print $1}' | grep -E '(-fe$)')
 if [ "$backendsha" != "$remotebackendsha" ]; then
     echo "Backend SHA is different from remote SHA. Rolling out update..."
     echo "$backendsha\n$remotebackendsha"
-    kubectl rollout restart deployment $backenddeployment -n meetverse
+    kubectl rollout restart deployment $backenddeployment -n marzoai
 else
     echo "Backend SHA matches the remote SHA. No update needed."
 fi
 if [ "$frontendsha" != "$remotefrontendsha" ]; then
     echo "Frontend SHA is different from remote SHA. Rolling out update..."
     echo "$frontendsha\n$remotefrontendsha"
-    kubectl rollout restart deployment $frontenddeployment -n meetverse
+    kubectl rollout restart deployment $frontenddeployment -n marzoai
 else
     echo "Frontend SHA matches the remote SHA. No update needed."
 fi

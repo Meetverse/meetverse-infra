@@ -6,11 +6,11 @@ import * as fs from "fs";
 import { templateSettings, template } from "lodash";
 import { CertManagerChart } from "./helm/cert-manager";
 import { Repository } from "@pulumi/gcp/artifactregistry";
-import { MeetverseChart } from "./helm/meetverse";
+import { MarzoAIChart } from "./helm/marzoai";
 
 templateSettings.interpolate = /\${([\s\S]+?)}/g;
 
-export class MeetVerseCluster extends pulumi.ComponentResource {
+export class MarzoAICluster extends pulumi.ComponentResource {
   public nginxRelease: k8s.helm.v3.Release;
   public clusterProvider: k8s.Provider;
 
@@ -20,9 +20,9 @@ export class MeetVerseCluster extends pulumi.ComponentResource {
     webHostname: string,
     diskSize: number | undefined
   ) {
-    super("Meetverse:Cluster", "cluster");
+    super("MarzoAI:Cluster", "cluster");
     const config = new pulumi.Config();
-    const name = "meetverse-cluster";
+    const name = "marzoai-cluster";
     diskSize = diskSize || 100;
 
     const serviceAccountEmail = config.get("serviceAccountEmail");
@@ -62,7 +62,7 @@ export class MeetVerseCluster extends pulumi.ComponentResource {
       }
     });
 
-    new gcp.container.NodePool("meetverse-node-pool", {
+    new gcp.container.NodePool("marzoai-node-pool", {
       cluster: cluster.name,
       initialNodeCount: 1,
       autoscaling: {
@@ -104,7 +104,7 @@ export class MeetVerseCluster extends pulumi.ComponentResource {
 
     new CertManagerChart(clusterProvider, adminEmail);
 
-    new MeetverseChart(
+    new MarzoAIChart(
       clusterProvider,
       repository,
       nginx.annotations,

@@ -1,11 +1,11 @@
 import * as pulumi from "@pulumi/pulumi";
 import * as gcp from "@pulumi/gcp";
 
-export class MeetVerseDNS extends pulumi.ComponentResource {
+export class MarzoAIDNS extends pulumi.ComponentResource {
   public gateway: gcp.dns.RecordSet | undefined;
   public web: gcp.dns.RecordSet | undefined;
   constructor(gw_ip: string, webHostname: string) {
-    super("Meetverse:DNS", "meetverse-dns");
+    super("MarzoAI:DNS", "marzoai-dns");
     const config = new pulumi.Config();
     const zoneId = config.get("dns_zone");
     if (!zoneId) {
@@ -15,7 +15,7 @@ export class MeetVerseDNS extends pulumi.ComponentResource {
     const zoneName = dnsZone.then((envDnsZone) => envDnsZone.name);
 
     this.gateway = new gcp.dns.RecordSet("gateway", {
-      name: dnsZone.then((zone) => `meetverse.gateway.${zone.dnsName}`),
+      name: dnsZone.then((zone) => `marzoai.gateway.${zone.dnsName}`),
       type: "A",
       managedZone: zoneName,
       rrdatas: [gw_ip]

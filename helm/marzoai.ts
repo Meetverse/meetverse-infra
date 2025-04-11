@@ -2,7 +2,7 @@ import * as k8s from "@pulumi/kubernetes";
 import * as pulumi from "@pulumi/pulumi";
 import * as gcp from "@pulumi/gcp";
 import { Repository } from "@pulumi/gcp/artifactregistry";
-import { MeetVerseSecret, MeetverseSecrets } from "../secret";
+import { MarzoAISecret, MarzoAISecrets } from "../secret";
 import { updater } from "../updater";
 
 type SecretValue = {
@@ -26,36 +26,36 @@ const dbname = config.require("dbname");
 const projectId = config.get("externalProjectId");
 const externalVertexKey = config.get("externalVertexKey");
 const extraJson = config.get("extraJson");
-export class MeetverseChart extends pulumi.ComponentResource {
+export class MarzoAIChart extends pulumi.ComponentResource {
   constructor(
     provider: k8s.Provider,
     repository: Repository,
     annotations: Record<string, string>,
     webHostname: string
   ) {
-    super("Meetverse:Cluster:Helm:Meetverse", "meetverse-chart");
+    super("MarzoAI:Cluster:Helm:MarzoAI", "marzoai-chart");
 
     const mongoServiceName = "mongodb";
     const qdrantServiceName = "qdrant";
     var isExternalProject = projectId !== undefined;
 
     const appLabels = {
-      app: "meetverse"
+      app: "marzo.ai"
     };
 
-    const meetversesNs = new k8s.core.v1.Namespace(
-      "meetverse-ns",
+    const marzoaisNs = new k8s.core.v1.Namespace(
+      "marzoai-ns",
       {
         metadata: {
           labels: appLabels,
-          name: "meetverse"
+          name: "marzoai"
         }
       },
       { provider: provider }
     );
     const serviceAccount = new gcp.serviceaccount.Account("service-account", {
-      accountId: "meetverse-sa",
-      displayName: "Service Account for meetverse application"
+      accountId: "marzoai-sa",
+      displayName: "Service Account for marzoai application"
     });
     let topic: any = undefined;
     if (!isExternalProject) {
@@ -71,8 +71,8 @@ export class MeetverseChart extends pulumi.ComponentResource {
         ackDeadlineSeconds: 30
       });
     }
-    updater(meetversesNs, provider);
-    meetversesNs.metadata.name.apply(async (namespace) => {
+    updater(marzoaisNs, provider);
+    marzoaisNs.metadata.name.apply(async (namespace) => {
       gcp.organizations.getProject({}).then((project) => {
         config.requireSecret("qdrant-key").apply((qdrantKey) => {
           config.requireSecret("google-client_id").apply((google_client_id) => {
@@ -126,7 +126,7 @@ export class MeetverseChart extends pulumi.ComponentResource {
                           }
                         );
                         pulumi.log.info(
-                          `Meetverse deployment project: ${project.projectId}`
+                          `MarzoAI deployment project: ${project.projectId}`
                         );
 
                         // Assign necessary roles to the service account
@@ -143,7 +143,8 @@ export class MeetverseChart extends pulumi.ComponentResource {
                           "vertexAiUserKey",
                           {
                             serviceAccountId: vertexAiUser.name
-                          }
+                          },
+                          { dependsOn: [vertexAiUser] }
                         );
 
                         const vertexAiUserKeyJson =
@@ -162,7 +163,7 @@ export class MeetverseChart extends pulumi.ComponentResource {
                         });
                         vertexAiKeyToUse = vertexAiUserKeyJson;
                       }
-                      const secretValues: MeetVerseSecret = {
+                      const secretValues: MarzoAISecret = {
                         GOOGLE_CLIENT_ID: google_client_id,
                         GOOGLE_CLIENT_SECRET: google_secret,
                         QDRANT_API_KEY: qdrantKey,
@@ -172,7 +173,7 @@ export class MeetverseChart extends pulumi.ComponentResource {
                         VERTEX_AI_USER_KEY: vertexAiKeyToUse,
                         ...extra
                       };
-                      const secret = new MeetverseSecrets(
+                      const secret = new MarzoAISecrets(
                         namespace,
                         secretValues,
                         provider
@@ -199,7 +200,7 @@ export class MeetverseChart extends pulumi.ComponentResource {
                             },
                             {
                               name: "QDRANT_COLLECTION",
-                              value: "meetverse"
+                              value: "marzoai"
                             },
                             {
                               name: "GOOGLE_REDIRECT_URIS",
@@ -262,11 +263,11 @@ export class MeetverseChart extends pulumi.ComponentResource {
                             });
                           });
                           new k8s.helm.v3.Release(
-                            "meetverse-chart",
+                            "marzoai-chart",
                             {
                               chart: "meetverse",
                               version: "0.3.9",
-                              namespace: meetversesNs.metadata.name,
+                              namespace: marzoaisNs.metadata.name,
                               repositoryOpts: {
                                 repo: "https://meetverse.github.io/meetverse-chart"
                               },
@@ -309,7 +310,7 @@ export class MeetverseChart extends pulumi.ComponentResource {
                                   tag: "latest"
                                 },
                                 serviceAccount: {
-                                  name: "meetverse-k8s",
+                                  name: "marzoai-k8s",
                                   annotations: {
                                     "iam.gke.io/gcp-service-account":
                                       serviceAccount.email
@@ -319,7 +320,7 @@ export class MeetverseChart extends pulumi.ComponentResource {
                                   annotations: annotations,
                                   tls: [
                                     {
-                                      secretName: "meetverse-tls",
+                                      secretName: "marzoai-tls",
                                       hosts: [webHostname]
                                     }
                                   ],

@@ -1,10 +1,10 @@
-import { MeetVerseCluster } from "./cluster";
-import { MeetverseRepository } from "./registry";
-import { MeetVerseDNS } from "./dns";
+import { MarzoAICluster } from "./cluster";
+import { MarzoAIRepository } from "./registry";
+import { MarzoAIDNS } from "./dns";
 import * as k8s from "@pulumi/kubernetes";
 import * as pulumi from "@pulumi/pulumi";
 
-const repo = new MeetverseRepository();
+const repo = new MarzoAIRepository();
 
 const config = new pulumi.Config();
 const domain = config.require("domain");
@@ -12,7 +12,7 @@ const app_hostname = config.require("app_hostname");
 
 const webHostname = `${app_hostname}.${domain}`;
 
-const cluster = new MeetVerseCluster(
+const cluster = new MarzoAICluster(
   "felipe.cruxen@toptal.com",
   repo.registry,
   webHostname,
@@ -36,8 +36,8 @@ cluster.nginxRelease.resourceNames.apply((resources) => {
     return "IP not available yet";
   });
   serviceExternalIP.apply((ip) => {
-    pulumi.log.info(`Meetverse deployment IP: ${ip}`);
+    pulumi.log.info(`Marzo.AI deployment IP: ${ip}`);
 
-    new MeetVerseDNS(ip, webHostname);
+    new MarzoAIDNS(ip, webHostname);
   });
 });
