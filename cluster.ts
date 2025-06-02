@@ -7,6 +7,7 @@ import { templateSettings, template } from "lodash";
 import { CertManagerChart } from "./helm/cert-manager";
 import { Repository } from "@pulumi/gcp/artifactregistry";
 import { MarzoAIChart } from "./helm/marzoai";
+import { CertDaddyManagerChart } from "./helm/cert-manager-godaddy";
 
 templateSettings.interpolate = /\${([\s\S]+?)}/g;
 
@@ -18,6 +19,7 @@ export class MarzoAICluster extends pulumi.ComponentResource {
     adminEmail: string,
     repository: Repository,
     webHostname: string,
+    webHostnameWild: string,
     diskSize: number | undefined
   ) {
     super("MarzoAI:Cluster", "cluster");
@@ -95,20 +97,30 @@ export class MarzoAICluster extends pulumi.ComponentResource {
         });
       });
 
-    const clusterProvider = new k8s.Provider(name, {
-      kubeconfig: kubeconfig
-    });
+    const clusterProvider = new k8s.Provider(
+      name,
+      {
+        kubeconfig: kubeconfig
+      },
+      { dependsOn: cluster }
+    );
     this.clusterProvider = clusterProvider;
     const nginx = new NginxChart(clusterProvider);
     this.nginxRelease = nginx.release;
 
-    new CertManagerChart(clusterProvider, adminEmail);
-
+    const cfg = new pulumi.Config();
+    const apiKey = cfg.get("gdapiKey");
+    if (apiKey && apiKey !== "") {
+      new CertDaddyManagerChart(clusterProvider, adminEmail);
+    } else {
+      new CertManagerChart(clusterProvider, adminEmail);
+    }
     new MarzoAIChart(
       clusterProvider,
       repository,
       nginx.annotations,
-      webHostname
+      webHostname,
+      webHostnameWild
     );
   }
 }

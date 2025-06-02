@@ -11,11 +11,13 @@ const domain = config.require("domain");
 const app_hostname = config.require("app_hostname");
 
 const webHostname = `${app_hostname}.${domain}`;
+const webHostnameWild = `${domain}`;
 
 const cluster = new MarzoAICluster(
   "felipe.cruxen@toptal.com",
   repo.registry,
   webHostname,
+  webHostnameWild,
   undefined
 );
 

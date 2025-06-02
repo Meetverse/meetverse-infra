@@ -31,7 +31,8 @@ export class MarzoAIChart extends pulumi.ComponentResource {
     provider: k8s.Provider,
     repository: Repository,
     annotations: Record<string, string>,
-    webHostname: string
+    webHostname: string,
+    webHostnameWild: string
   ) {
     super("MarzoAI:Cluster:Helm:MarzoAI", "marzoai-chart");
 
@@ -53,10 +54,14 @@ export class MarzoAIChart extends pulumi.ComponentResource {
       },
       { provider: provider }
     );
-    const serviceAccount = new gcp.serviceaccount.Account("service-account", {
-      accountId: "marzoai-sa",
-      displayName: "Service Account for marzoai application"
-    });
+    const serviceAccount = new gcp.serviceaccount.Account(
+      "service-account",
+      {
+        accountId: "marzoai-sa",
+        displayName: "Service Account for marzoai application"
+      },
+      { deleteBeforeReplace: true }
+    );
     let topic: any = undefined;
     if (!isExternalProject) {
       topic = new gcp.pubsub.Topic("meetverse-meeting-topic", {
@@ -163,6 +168,13 @@ export class MarzoAIChart extends pulumi.ComponentResource {
                         });
                         vertexAiKeyToUse = vertexAiUserKeyJson;
                       }
+                      let url = webHostname;
+
+                      const cfg = new pulumi.Config();
+                      const apiKey = cfg.get("gdapiKey");
+                      if (apiKey && apiKey !== "") {
+                        url = `*.${webHostnameWild}`;
+                      }
                       const secretValues: MarzoAISecret = {
                         GOOGLE_CLIENT_ID: google_client_id,
                         GOOGLE_CLIENT_SECRET: google_secret,
@@ -266,7 +278,7 @@ export class MarzoAIChart extends pulumi.ComponentResource {
                             "marzoai-chart",
                             {
                               chart: "meetverse",
-                              version: "0.3.9",
+                              version: "0.4.14",
                               namespace: marzoaisNs.metadata.name,
                               repositoryOpts: {
                                 repo: "https://meetverse.github.io/meetverse-chart"
@@ -321,12 +333,12 @@ export class MarzoAIChart extends pulumi.ComponentResource {
                                   tls: [
                                     {
                                       secretName: "marzoai-tls",
-                                      hosts: [webHostname]
+                                      hosts: [url]
                                     }
                                   ],
                                   hosts: [
                                     {
-                                      host: webHostname,
+                                      host: url,
                                       paths: [
                                         {
                                           path: "/",
