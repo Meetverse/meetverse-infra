@@ -278,7 +278,7 @@ export class MarzoAIChart extends pulumi.ComponentResource {
                             "marzoai-chart",
                             {
                               chart: "meetverse",
-                              version: "0.4.14",
+                              version: "0.4.15",
                               namespace: marzoaisNs.metadata.name,
                               repositoryOpts: {
                                 repo: "https://meetverse.github.io/meetverse-chart"

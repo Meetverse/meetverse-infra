@@ -116,8 +116,8 @@ export class CertDaddyManagerChart extends pulumi.ComponentResource {
                         key: "token"
                       },
                       ttl: 600,
-                      propagationTimeout: 600, // seconds
-                      pollingInterval: 30, // seconds
+                      propagationTimeout: 1800, // seconds
+                      pollingInterval: 60, // seconds
                       sequenceInterval: 60 // seconds (optional, safe default)
                     }
                   }

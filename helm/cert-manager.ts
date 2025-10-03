@@ -43,7 +43,7 @@ export class CertManagerChart extends pulumi.ComponentResource {
                 // Configuration for the HTTP01 challenge provider
                 http01: {
                   ingress: {
-                    class: "nginx"
+                    ingressClassName: "nginx"
                   }
                 }
               }
