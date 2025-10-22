@@ -161,11 +161,7 @@ export class MarzoAIChart extends pulumi.ComponentResource {
                             const mobj = JSON.parse(json);
                             return JSON.stringify(mobj);
                           });
-                        vertexAiUserKeyJson.apply((keyJson) => {
-                          pulumi.log.info(
-                            `Vertex AI User Key JSON: ${keyJson}`
-                          );
-                        });
+
                         vertexAiKeyToUse = vertexAiUserKeyJson;
                       }
                       let url = webHostname;
@@ -179,7 +175,7 @@ export class MarzoAIChart extends pulumi.ComponentResource {
                         GOOGLE_CLIENT_ID: google_client_id,
                         GOOGLE_CLIENT_SECRET: google_secret,
                         QDRANT_API_KEY: qdrantKey,
-                        MONGODB_URI: `mongodb://${dbuser}:${dbpass}@${mongoServiceName}.${namespace}.svc.cluster.local/${dbname}`,
+                        MONGODB_URI: `${dbuser}`,
                         "mongodb-passwords": dbpass,
                         "mongodb-root-password": dbrootpass,
                         VERTEX_AI_USER_KEY: vertexAiKeyToUse,
@@ -277,8 +273,9 @@ export class MarzoAIChart extends pulumi.ComponentResource {
                           new k8s.helm.v3.Release(
                             "marzoai-chart",
                             {
+                              name: "marzoai-chart",
                               chart: "meetverse",
-                              version: "0.4.15",
+                              version: "0.4.16",
                               namespace: marzoaisNs.metadata.name,
                               repositoryOpts: {
                                 repo: "https://meetverse.github.io/meetverse-chart"
@@ -375,8 +372,8 @@ export class MarzoAIChart extends pulumi.ComponentResource {
                                     nameOverride: mongoServiceName
                                   },
                                   auth: {
-                                    usernames: [dbuser],
-                                    databases: [dbname],
+                                    usernames: ["user"],
+                                    databases: ["marzo"],
                                     existingSecret: secretname
                                   }
                                 }

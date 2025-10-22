@@ -52,37 +52,51 @@ export class MarzoAICluster extends pulumi.ComponentResource {
         addition["subnetwork"] = subnetwork;
       }
     }
-    const cluster = new gcp.container.Cluster(name, {
-      initialNodeCount: 1,
-      removeDefaultNodePool: true,
-      minMasterVersion: engineVersion,
-      ...addition,
-      nodeConfig: {
-        machineType: "n1-standard-2",
-        diskSizeGb: 50,
-        ...serviceAccountAddition
-      }
-    });
-
-    new gcp.container.NodePool("marzoai-node-pool", {
-      cluster: cluster.name,
-      initialNodeCount: 1,
-      autoscaling: {
-        minNodeCount: 0,
-        maxNodeCount: 1
+    const cluster = new gcp.container.Cluster(
+      name,
+      {
+        name: name,
+        initialNodeCount: 1,
+        removeDefaultNodePool: true,
+        minMasterVersion: engineVersion,
+        ...addition,
+        nodeConfig: {
+          machineType: "n1-standard-2",
+          diskSizeGb: 50,
+          ...serviceAccountAddition
+        }
       },
-      nodeConfig: {
-        machineType: "n1-standard-2",
-        diskSizeGb: 50,
-        oauthScopes: [
-          "https://www.googleapis.com/auth/compute",
-          "https://www.googleapis.com/auth/devstorage.read_only",
-          "https://www.googleapis.com/auth/logging.write",
-          "https://www.googleapis.com/auth/monitoring"
-        ],
-        ...serviceAccountAddition
+      {
+        ignoreChanges: ["nodeConfig", "initialNodeCount", "minMasterVersion"]
       }
-    });
+    );
+
+    new gcp.container.NodePool(
+      "marzoai-node-pool",
+      {
+        name: "marzoai-node-pool",
+        cluster: cluster.name,
+        initialNodeCount: 1,
+        autoscaling: {
+          minNodeCount: 0,
+          maxNodeCount: 1
+        },
+        nodeConfig: {
+          machineType: "n1-standard-2",
+          diskSizeGb: 50,
+          oauthScopes: [
+            "https://www.googleapis.com/auth/compute",
+            "https://www.googleapis.com/auth/devstorage.read_only",
+            "https://www.googleapis.com/auth/logging.write",
+            "https://www.googleapis.com/auth/monitoring"
+          ],
+          ...serviceAccountAddition
+        }
+      },
+      {
+        ignoreChanges: ["nodeConfig"]
+      }
+    );
 
     const kubeconfig = pulumi
       .all([cluster.name, cluster.endpoint, cluster.masterAuth])
