@@ -36,8 +36,6 @@ export class MarzoAIChart extends pulumi.ComponentResource {
   ) {
     super("MarzoAI:Cluster:Helm:MarzoAI", "marzoai-chart");
 
-    const mongoServiceName = "mongodb";
-    const qdrantServiceName = "qdrant";
     var isExternalProject = projectId !== undefined;
 
     const appLabels = {
@@ -79,324 +77,275 @@ export class MarzoAIChart extends pulumi.ComponentResource {
     updater(marzoaisNs, provider);
     marzoaisNs.metadata.name.apply(async (namespace) => {
       gcp.organizations.getProject({}).then((project) => {
-        config.requireSecret("qdrant-key").apply((qdrantKey) => {
-          config.requireSecret("google-client_id").apply((google_client_id) => {
-            config.requireSecret("google-secret").apply((google_secret) => {
-              config
-                .requireSecret("google-client_id")
-                .apply((google_client_id) => {
-                  config.requireSecret("dbrootpass").apply((dbrootpass) => {
-                    config.requireSecret("dbpass").apply((dbpass) => {
-                      var projectIdToUse: any = isExternalProject
-                        ? projectId
-                        : project.projectId;
-                      var setExternalProject = isExternalProject
-                        ? "true"
-                        : "false";
-                      var topicName = isExternalProject
-                        ? project.projectId
-                        : "meetverse-meeting-topic";
-                      var vertexAiKeyToUse: any = undefined;
-                      if (externalVertexKey !== undefined) {
-                        try {
-                          var json = JSON.parse(externalVertexKey);
-                          vertexAiKeyToUse = JSON.stringify(json);
-                        } catch (error) {}
-                      }
-                      let extra = {};
-                      if (extraJson !== undefined) {
-                        try {
-                          var json = JSON.parse(extraJson);
+        config.requireSecret("google-client_id").apply((google_client_id) => {
+          config.requireSecret("google-secret").apply((google_secret) => {
+            config
+              .requireSecret("google-client_id")
+              .apply((google_client_id) => {
+                config.requireSecret("dbrootpass").apply((dbrootpass) => {
+                  config.requireSecret("dbpass").apply((dbpass) => {
+                    var projectIdToUse: any = isExternalProject
+                      ? projectId
+                      : project.projectId;
+                    var setExternalProject = isExternalProject
+                      ? "true"
+                      : "false";
+                    var topicName = isExternalProject
+                      ? project.projectId
+                      : "meetverse-meeting-topic";
+                    var vertexAiKeyToUse: any = undefined;
+                    if (externalVertexKey !== undefined) {
+                      try {
+                        var json = JSON.parse(externalVertexKey);
+                        vertexAiKeyToUse = JSON.stringify(json);
+                      } catch (error) {}
+                    }
+                    let extra = {};
+                    if (extraJson !== undefined) {
+                      try {
+                        var json = JSON.parse(extraJson);
 
-                          extra = json;
-                        } catch (error) {}
-                      }
+                        extra = json;
+                      } catch (error) {}
+                    }
 
-                      if (!isExternalProject) {
-                        new gcp.pubsub.TopicIAMMember("topic-iam-binding", {
-                          topic: topic.name.apply(
-                            (t) => `${project.id}/topics/${t}`
-                          ),
-                          role: "roles/pubsub.publisher",
-                          member: "allAuthenticatedUsers"
-                        });
-                      }
-                      if (vertexAiKeyToUse === undefined) {
-                        // Create the 'Vertex AI User' service account
-                        const vertexAiUser = new gcp.serviceaccount.Account(
-                          "vertexAiUser",
-                          {
-                            accountId: "vertex-ai-user",
-                            displayName: "Vertex AI User"
-                          }
-                        );
-                        pulumi.log.info(
-                          `MarzoAI deployment project: ${project.projectId}`
-                        );
-
-                        // Assign necessary roles to the service account
-                        const vertexAiUserRoleBinding =
-                          new gcp.projects.IAMMember(
-                            "vertexAiUserRoleBinding",
-                            {
-                              project: pulumi.interpolate`${project.projectId}`,
-                              role: "roles/aiplatform.user",
-                              member: pulumi.interpolate`serviceAccount:${vertexAiUser.email}`
-                            }
-                          );
-                        const vertexAiUserKey = new gcp.serviceaccount.Key(
-                          "vertexAiUserKey",
-                          {
-                            serviceAccountId: vertexAiUser.name
-                          },
-                          { dependsOn: [vertexAiUser] }
-                        );
-
-                        const vertexAiUserKeyJson =
-                          vertexAiUserKey.privateKey.apply((privateKey) => {
-                            const json = Buffer.from(
-                              privateKey,
-                              "base64"
-                            ).toString("utf-8");
-                            const mobj = JSON.parse(json);
-                            return JSON.stringify(mobj);
-                          });
-
-                        vertexAiKeyToUse = vertexAiUserKeyJson;
-                      }
-                      let url = webHostname;
-
-                      const cfg = new pulumi.Config();
-                      const apiKey = cfg.get("gdapiKey");
-                      if (apiKey && apiKey !== "") {
-                        url = `*.${webHostnameWild}`;
-                      }
-                      const secretValues: MarzoAISecret = {
-                        GOOGLE_CLIENT_ID: google_client_id,
-                        GOOGLE_CLIENT_SECRET: google_secret,
-                        QDRANT_API_KEY: qdrantKey,
-                        MONGODB_URI: `${dbuser}`,
-                        "mongodb-passwords": dbpass,
-                        "mongodb-root-password": dbrootpass,
-                        VERTEX_AI_USER_KEY: vertexAiKeyToUse,
-                        ...extra
-                      };
-                      const secret = new MarzoAISecrets(
-                        namespace,
-                        secretValues,
-                        provider
+                    if (!isExternalProject) {
+                      new gcp.pubsub.TopicIAMMember("topic-iam-binding", {
+                        topic: topic.name.apply(
+                          (t) => `${project.id}/topics/${t}`
+                        ),
+                        role: "roles/pubsub.publisher",
+                        member: "allAuthenticatedUsers"
+                      });
+                    }
+                    if (vertexAiKeyToUse === undefined) {
+                      // Create the 'Vertex AI User' service account
+                      const vertexAiUser = new gcp.serviceaccount.Account(
+                        "vertexAiUser",
+                        {
+                          accountId: "vertex-ai-user",
+                          displayName: "Vertex AI User"
+                        }
                       );
-                      secret.secretResource.metadata.name.apply(
-                        (secretname) => {
-                          let env: Env[] = [
-                            {
-                              name: "WEB_URI",
-                              value: `https://${webHostname}`
-                            },
+                      pulumi.log.info(
+                        `MarzoAI deployment project: ${project.projectId}`
+                      );
 
-                            {
-                              name: "QDRANT_HOST",
-                              value: `${qdrantServiceName}.${namespace}.svc.cluster.local`
-                            },
-                            {
-                              name: "QDRANT_PORT",
-                              value: "6333"
-                            },
-                            {
-                              name: "QDRANT_HTTPS",
-                              value: "false"
-                            },
-                            {
-                              name: "QDRANT_COLLECTION",
-                              value: "marzoai"
-                            },
-                            {
-                              name: "GOOGLE_REDIRECT_URIS",
-                              value: `["http://localhost:8000/api/oauth2callback","https://${webHostname}/oauth2callback"]`
-                            },
-                            {
-                              name: "RUN_MODE",
-                              value: "cloud"
-                            },
-                            {
-                              name: "DB_NAME",
-                              value: dbname
-                            },
-                            {
-                              name: "PERSISTENT_SESSION",
-                              value: "true"
-                            },
-                            {
-                              name: "DD_LOGS_INJECTION",
-                              value: "false"
-                            },
-                            {
-                              name: "DD_SITE",
-                              value: "us5.datadoghq.com"
-                            },
-                            {
-                              name: "DD_TRACE_ENABLED",
-                              value: "true"
-                            },
-                            {
-                              name: "DD_TRACE_PROPAGATION_STYLE",
-                              value: "datadog"
-                            },
-                            {
-                              name: "GOOGLE_PROJECT_ID",
-                              value: projectIdToUse
-                            },
-                            {
-                              name: "EXTERNAL_PROJECT",
-                              value: setExternalProject
-                            },
-                            {
-                              name: "NO_GOOGLE_DRIVE",
-                              value: setExternalProject
-                            },
-                            {
-                              name: "MEETING_TOPIC_NAME",
-                              value: topicName
+                      // Assign necessary roles to the service account
+                      const vertexAiUserRoleBinding =
+                        new gcp.projects.IAMMember("vertexAiUserRoleBinding", {
+                          project: pulumi.interpolate`${project.projectId}`,
+                          role: "roles/aiplatform.user",
+                          member: pulumi.interpolate`serviceAccount:${vertexAiUser.email}`
+                        });
+                      const vertexAiUserKey = new gcp.serviceaccount.Key(
+                        "vertexAiUserKey",
+                        {
+                          serviceAccountId: vertexAiUser.name
+                        },
+                        { dependsOn: [vertexAiUser] }
+                      );
+
+                      const vertexAiUserKeyJson =
+                        vertexAiUserKey.privateKey.apply((privateKey) => {
+                          const json = Buffer.from(
+                            privateKey,
+                            "base64"
+                          ).toString("utf-8");
+                          const mobj = JSON.parse(json);
+                          return JSON.stringify(mobj);
+                        });
+
+                      vertexAiKeyToUse = vertexAiUserKeyJson;
+                    }
+                    let url = webHostname;
+
+                    const cfg = new pulumi.Config();
+                    const apiKey = cfg.get("gdapiKey");
+                    if (apiKey && apiKey !== "") {
+                      url = `*.${webHostnameWild}`;
+                    }
+                    const secretValues: MarzoAISecret = {
+                      GOOGLE_CLIENT_ID: google_client_id,
+                      GOOGLE_CLIENT_SECRET: google_secret,
+                      MONGODB_URI: `${dbuser}`,
+                      "mongodb-passwords": dbpass,
+                      "mongodb-root-password": dbrootpass,
+                      VERTEX_AI_USER_KEY: vertexAiKeyToUse,
+                      ...extra
+                    };
+                    const secret = new MarzoAISecrets(
+                      namespace,
+                      secretValues,
+                      provider
+                    );
+                    secret.secretResource.metadata.name.apply((secretname) => {
+                      let env: Env[] = [
+                        {
+                          name: "WEB_URI",
+                          value: `https://${webHostname}`
+                        },
+                        {
+                          name: "GOOGLE_REDIRECT_URIS",
+                          value: `["http://localhost:8000/api/oauth2callback","https://${webHostname}/oauth2callback"]`
+                        },
+                        {
+                          name: "RUN_MODE",
+                          value: "cloud"
+                        },
+                        {
+                          name: "DB_NAME",
+                          value: dbname
+                        },
+                        {
+                          name: "PERSISTENT_SESSION",
+                          value: "true"
+                        },
+                        {
+                          name: "DD_LOGS_INJECTION",
+                          value: "false"
+                        },
+                        {
+                          name: "DD_SITE",
+                          value: "us5.datadoghq.com"
+                        },
+                        {
+                          name: "DD_TRACE_ENABLED",
+                          value: "true"
+                        },
+                        {
+                          name: "DD_TRACE_PROPAGATION_STYLE",
+                          value: "datadog"
+                        },
+                        {
+                          name: "GOOGLE_PROJECT_ID",
+                          value: projectIdToUse
+                        },
+                        {
+                          name: "EXTERNAL_PROJECT",
+                          value: setExternalProject
+                        },
+                        {
+                          name: "NO_GOOGLE_DRIVE",
+                          value: setExternalProject
+                        },
+                        {
+                          name: "MEETING_TOPIC_NAME",
+                          value: topicName
+                        }
+                      ];
+                      Object.keys(secretValues).map((key) => {
+                        env.push({
+                          name: key,
+                          valueFrom: {
+                            secretKeyRef: {
+                              name: secretname,
+                              key: key
                             }
-                          ];
-                          Object.keys(secretValues).map((key) => {
-                            env.push({
-                              name: key,
-                              valueFrom: {
-                                secretKeyRef: {
-                                  name: secretname,
-                                  key: key
-                                }
-                              }
-                            });
-                          });
-                          new k8s.helm.v3.Release(
-                            "marzoai-chart",
-                            {
-                              name: "marzoai-chart",
-                              chart: "meetverse",
-                              version: "0.4.16",
-                              namespace: marzoaisNs.metadata.name,
-                              repositoryOpts: {
-                                repo: "https://meetverse.github.io/meetverse-chart"
+                          }
+                        });
+                      });
+                      new k8s.helm.v3.Release(
+                        "marzoai-chart",
+                        {
+                          name: "marzoai-chart",
+                          chart: "meetverse",
+                          version: "0.4.23",
+                          namespace: marzoaisNs.metadata.name,
+                          repositoryOpts: {
+                            repo: "https://meetverse.github.io/meetverse-chart"
+                          },
+                          skipCrds: false,
+                          values: {
+                            replicaCount: 1,
+                            env: env,
+                            frontend: {
+                              image: {
+                                tag: "latest"
                               },
-                              skipCrds: false,
-                              values: {
-                                replicaCount: 1,
-                                env: env,
-                                frontend: {
-                                  image: {
-                                    tag: "latest"
-                                  },
-                                  service: {
-                                    port: 8080
-                                  }
-                                },
-                                livenessProbe: {
-                                  httpGet: {
-                                    path: "/health",
-                                    port: "http"
-                                  }
-                                },
-                                readinessProbe: {
-                                  httpGet: {
-                                    path: "/health",
-                                    port: "http"
-                                  }
-                                },
-                                resources: {
-                                  requests: {
-                                    cpu: "512m",
-                                    memory: "2Gi"
-                                  },
-                                  limits: {
-                                    cpu: "512m",
-                                    memory: "3Gi"
-                                  }
-                                },
-                                image: {
-                                  pullPolicy: "Always",
-                                  tag: "latest"
-                                },
-                                serviceAccount: {
-                                  name: "marzoai-k8s",
-                                  annotations: {
-                                    "iam.gke.io/gcp-service-account":
-                                      serviceAccount.email
-                                  }
-                                },
-                                ingress: {
-                                  annotations: annotations,
-                                  tls: [
+                              service: {
+                                port: 8080
+                              }
+                            },
+                            livenessProbe: {
+                              httpGet: {
+                                path: "/health",
+                                port: "http"
+                              }
+                            },
+                            readinessProbe: {
+                              httpGet: {
+                                path: "/health",
+                                port: "http"
+                              }
+                            },
+                            resources: {
+                              requests: {
+                                cpu: "1000m",
+                                memory: "2Gi"
+                              },
+                              limits: {
+                                cpu: "2000m",
+                                memory: "4Gi"
+                              }
+                            },
+                            image: {
+                              pullPolicy: "Always",
+                              tag: "latest"
+                            },
+                            serviceAccount: {
+                              name: "marzoai-k8s",
+                              annotations: {
+                                "iam.gke.io/gcp-service-account":
+                                  serviceAccount.email
+                              }
+                            },
+                            ingress: {
+                              annotations: annotations,
+                              tls: [
+                                {
+                                  secretName: "marzoai-tls",
+                                  hosts: [url]
+                                }
+                              ],
+                              hosts: [
+                                {
+                                  host: url,
+                                  paths: [
                                     {
-                                      secretName: "marzoai-tls",
-                                      hosts: [url]
-                                    }
-                                  ],
-                                  hosts: [
+                                      path: "/",
+                                      pathType: "ImplementationSpecific"
+                                    },
                                     {
-                                      host: url,
-                                      paths: [
-                                        {
-                                          path: "/",
-                                          pathType: "ImplementationSpecific"
-                                        },
-                                        {
-                                          path: "/api",
-                                          pathType: "ImplementationSpecific"
-                                        },
-                                        {
-                                          path: "/ws",
-                                          pathType: "ImplementationSpecific"
-                                        }
-                                      ]
+                                      path: "/api",
+                                      pathType: "ImplementationSpecific"
+                                    },
+                                    {
+                                      path: "/ws",
+                                      pathType: "ImplementationSpecific"
                                     }
                                   ]
-                                },
-                                qdrant: {
-                                  apiKey: qdrantKey,
-                                  fullnameOverride: "qdrant"
-                                },
-                                mongodb: {
-                                  resources: {
-                                    requests: {
-                                      cpu: "500m",
-                                      memory: "512Mi"
-                                    },
-                                    limits: {
-                                      cpu: "500m",
-                                      memory: "512Mi"
-                                    }
-                                  },
-                                  service: {
-                                    nameOverride: mongoServiceName
-                                  },
-                                  auth: {
-                                    usernames: ["user"],
-                                    databases: ["marzo"],
-                                    existingSecret: secretname
-                                  }
                                 }
-                              }
-                            },
-                            { provider: provider }
-                          );
-
-                          new gcp.artifactregistry.RepositoryIamMember(
-                            "iam-member",
-                            {
-                              location: repository.location,
-                              repository: repository.name,
-                              role: "roles/artifactregistry.reader",
-                              member: pulumi.interpolate`serviceAccount:${serviceAccount.email}`
+                              ]
                             }
-                          );
+                          }
+                        },
+                        { provider: provider }
+                      );
+
+                      new gcp.artifactregistry.RepositoryIamMember(
+                        "iam-member",
+                        {
+                          location: repository.location,
+                          repository: repository.name,
+                          role: "roles/artifactregistry.reader",
+                          member: pulumi.interpolate`serviceAccount:${serviceAccount.email}`
                         }
                       );
                     });
                   });
                 });
-            });
+              });
           });
         });
       });

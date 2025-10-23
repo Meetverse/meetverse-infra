@@ -4,7 +4,6 @@ import * as k8s from "@pulumi/kubernetes";
 export type MarzoAISecret = {
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
-  QDRANT_API_KEY: string;
   MONGODB_URI: string;
   "mongodb-passwords": string;
   "mongodb-root-password": string;
