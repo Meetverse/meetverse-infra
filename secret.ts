@@ -5,8 +5,6 @@ export type MarzoAISecret = {
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
   MONGODB_URI: string;
-  "mongodb-passwords": string;
-  "mongodb-root-password": string;
   VERTEX_AI_USER_KEY: pulumi.Output<string>;
 };
 
